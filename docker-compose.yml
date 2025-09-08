@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  storefront-agent:
+    build: .
+    container_name: storefront-agent
+    environment:
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-02-15-preview}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+      - MCP_SERVER_URL=${MCP_SERVER_URL:-ws://mcp-server:8080}
+      - MCP_SERVER_TIMEOUT=${MCP_SERVER_TIMEOUT:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    volumes:
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    depends_on:
+      - mcp-server
+    networks:
+      - storefront-network
+    restart: unless-stopped
+
+  # Example MCP server (replace with your actual MCP server)
+  mcp-server:
+    image: nginx:alpine
+    container_name: mcp-server
+    ports:
+      - "8080:80"
+    networks:
+      - storefront-network
+    restart: unless-stopped
+    # Replace this with your actual MCP server image and configuration
+
+networks:
+  storefront-network:
+    driver: bridge
+
+volumes:
+  logs:

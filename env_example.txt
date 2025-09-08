@@ -1,0 +1,13 @@
+# Azure Configuration
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-api-key-here
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+
+# MCP Server Configuration
+MCP_SERVER_URL=ws://localhost:8080
+MCP_SERVER_TIMEOUT=30
+
+# Application Configuration
+LOG_LEVEL=INFO
+MAX_RETRIES=3
