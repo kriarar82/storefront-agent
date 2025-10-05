@@ -241,13 +241,11 @@ The MCP server has these tools available:
 - get_products_by_category: Get products by category
 
 Please provide:
-1. A clear explanation of what happened
-2. Whether the operation was successful
-3. Any relevant data or results from the tool execution
-4. If there was an error, explain what went wrong and suggest alternatives
-5. Next steps if applicable
-
-Keep the explanation conversational and helpful for a non-technical user.
+1. Restate succinctly what the user asked.
+2. Clearly say whether the requested product or products are available based on results.
+3. Summarize the most relevant details (e.g., product name, price, availability) in 1-3 short sentences.
+4. If there was an error, explain briefly what went wrong and suggest a tool-driven next step.
+5. Keep it conversational and concise.
 """
             
             response = await self.generate_response(
@@ -262,6 +260,60 @@ Keep the explanation conversational and helpful for a non-technical user.
         except Exception as e:
             logger.error(f"Error interpreting MCP response: {str(e)}")
             raise AzureLLMError(f"Failed to interpret MCP response: {str(e)}")
+
+    async def generate_no_matching_tool_response(
+        self,
+        original_request: str,
+        available_tools: Optional[List[Dict[str, Any]]] = None
+    ) -> str:
+        """
+        Generate a friendly response when no matching tool was found for the user request.
+        """
+        try:
+            tool_lines = []
+            if available_tools:
+                for tool in available_tools[:8]:  # limit to avoid long prompts
+                    name = tool.get("name") or tool.get("tool_name") or "unknown_tool"
+                    description = tool.get("description") or ""
+                    tool_lines.append(f"- {name}: {description}")
+            tools_text = "\n".join(tool_lines) if tool_lines else (
+                "- get_product: Get product by ID\n"
+                "- search_products: Search products by query\n"
+                "- get_categories: List categories\n"
+                "- get_products_by_category: Products by category"
+            )
+
+            prompt = f"""
+You are a friendly customer service agent for an online storefront.
+
+The user asked: "{original_request}"
+
+No matching tool was confidently identified for this request.
+
+Please respond as a helpful customer service agent:
+- Greet briefly and acknowledge the request.
+- Explain that you couldn't find an exact tool match for that request.
+- Offer guidance on how to proceed using available capabilities (below), with one concise example.
+- Ask 1 clarifying question if it helps move forward.
+
+Available tools:
+{tools_text}
+
+Keep the response to 2-5 sentences, clear and conversational.
+"""
+
+            response = await self.generate_response(
+                user_input=prompt,
+                temperature=0.6,
+                max_tokens=150
+            )
+            return response["content"]
+        except Exception as e:
+            logger.error(f"Error generating no-matching-tool response: {str(e)}")
+            return (
+                "Hi! I couldn't find a matching tool for that. Try asking about products, "
+                "categories, or searching for items by name or category."
+            )
 
 
 class AzureLLMError(Exception):

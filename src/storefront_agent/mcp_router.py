@@ -237,6 +237,14 @@ If no server is appropriate, set "selected_server" to null and explain why."""
             server_name = selection["selected_server"]
             tool_name = selection.get("tool_name")
             parameters = selection.get("parameters", {})
+
+            # If no specific tool was selected, signal fallback to the caller
+            if not tool_name:
+                return {
+                    "success": False,
+                    "error": "No appropriate tool selected",
+                    "selection": selection
+                }
             
             # Ensure we're connected to the selected server
             if server_name not in self.connected_servers:

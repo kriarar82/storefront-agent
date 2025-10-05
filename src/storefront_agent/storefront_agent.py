@@ -130,7 +130,29 @@ class StorefrontAgent:
             mcp_result = await self.mcp_router.execute_request(user_input)
             
             if not mcp_result.get("success"):
-                # If MCP execution failed, provide a helpful error message
+                # If no matching server/tool was found, ask LLM to produce a helpful fallback
+                selection = mcp_result.get("selection") or {}
+                if not selection.get("selected_server"):
+                    # Gather tool list for helpful hinting
+                    try:
+                        available_ops = await self.get_available_operations()
+                        tools_for_prompt = available_ops.get("tools", [])
+                    except Exception:
+                        tools_for_prompt = []
+
+                    fallback_text = await self.azure_llm.generate_no_matching_tool_response(
+                        original_request=user_input,
+                        available_tools=tools_for_prompt
+                    )
+                    return {
+                        "user_input": user_input,
+                        "mcp_result": mcp_result,
+                        "final_response": fallback_text,
+                        "success": False,
+                        "error": mcp_result.get("error", "No matching tool found")
+                    }
+
+                # Otherwise, return an error-aware interpretation
                 logger.warning("MCP execution failed")
                 return {
                     "user_input": user_input,

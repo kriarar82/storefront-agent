@@ -5,7 +5,7 @@ import json
 import os
 import uuid
 from typing import Dict, Any, Optional, List
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -23,6 +23,9 @@ agent: Optional[StorefrontAgent] = None
 
 # Active SSE connections
 active_sse_connections: Dict[str, asyncio.Queue] = {}
+
+# Active WebSocket connections
+active_ws_connections: Dict[str, WebSocket] = {}
 
 
 class ChatRequest(BaseModel):
@@ -99,8 +102,13 @@ async def get_agent() -> StorefrontAgent:
 async def startup_event():
     """Initialize the agent on startup."""
     try:
-        await get_agent()
-        logger.info("Storefront Agent API started successfully")
+        # Allow skipping startup initialization for local testing
+        skip_init = os.getenv("SKIP_STARTUP_INIT", "false").lower() == "true"
+        if skip_init:
+            logger.info("Skipping agent initialization on startup (SKIP_STARTUP_INIT=true)")
+        else:
+            await get_agent()
+            logger.info("Storefront Agent API started successfully")
     except Exception as e:
         logger.error(f"Failed to start Storefront Agent API: {str(e)}")
         raise
@@ -394,33 +402,93 @@ async def close_sse_connection(session_id: str):
 
 # WebSocket endpoint for real-time chat (optional)
 @app.websocket("/ws/chat")
-async def websocket_chat(websocket):
+async def websocket_chat(websocket: WebSocket):
     """WebSocket endpoint for real-time chat."""
+    # Accept the connection first
     await websocket.accept()
-    
+
+    # Determine or assign a session_id from query params
+    session_id = websocket.query_params.get("session_id") if hasattr(websocket, "query_params") else None
+    if not session_id:
+        session_id = str(uuid.uuid4())
+
+    # Register active connection
+    active_ws_connections[session_id] = websocket
+
+    # Send initial connected event
+    try:
+        await websocket.send_text(json.dumps({
+            "event": "connected",
+            "data": {"session_id": session_id, "message": "Connected to Storefront Agent"}
+        }))
+    except Exception as e:
+        logger.error(f"Failed to send connected event: {str(e)}")
+
     try:
         agent_instance = await get_agent()
-        
+
         while True:
             # Receive message from client
-            data = await websocket.receive_text()
-            message_data = json.loads(data)
-            
+            raw = await websocket.receive_text()
+            try:
+                message_data = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    "event": "error",
+                    "data": {"message": "Invalid JSON payload"}
+                }))
+                continue
+
+            user_message = message_data.get("message", "")
+
+            # Send processing event
+            try:
+                await websocket.send_text(json.dumps({
+                    "event": "processing",
+                    "data": {
+                        "message": user_message,
+                        "status": "processing"
+                    }
+                }))
+            except Exception as e:
+                logger.warning(f"Failed to send processing event: {str(e)}")
+
             # Process the message
-            result = await agent_instance.process_user_request(message_data.get("message", ""))
-            
+            result = await agent_instance.process_user_request(user_message)
+
             # Send response back
-            response = {
-                "response": result.get("final_response", "I'm sorry, I couldn't process your request."),
-                "success": result.get("success", False),
-                "mcp_details": result.get("mcp_result")
+            response_event = {
+                "event": "response",
+                "data": {
+                    "response": result.get("final_response", "I'm sorry, I couldn't process your request."),
+                    "success": result.get("success", False),
+                    "session_id": session_id,
+                    "error": result.get("error"),
+                    "mcp_details": result.get("mcp_result")
+                }
             }
-            
-            await websocket.send_text(json.dumps(response))
-            
+
+            await websocket.send_text(json.dumps(response_event))
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected: {session_id}")
     except Exception as e:
         logger.error(f"WebSocket error: {str(e)}")
-        await websocket.close()
+        try:
+            await websocket.send_text(json.dumps({
+                "event": "error",
+                "data": {"message": str(e)}
+            }))
+        except Exception:
+            pass
+    finally:
+        # Cleanup connection
+        if session_id in active_ws_connections:
+            del active_ws_connections[session_id]
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
