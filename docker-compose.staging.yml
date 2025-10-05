@@ -1,0 +1,35 @@
+# Docker Compose configuration for staging environment
+
+version: '3.8'
+
+services:
+  storefront-agent:
+    build: .
+    container_name: storefront-agent-staging
+    environment:
+      - ENVIRONMENT=staging
+    env_file:
+      - env.staging
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - storefront-network
+    restart: unless-stopped
+    command: ["python", "-m", "storefront_agent.cli", "run", "--environment", "staging"]
+
+  # MCP Server for staging
+  mcp-server:
+    image: your-mcp-server:staging
+    container_name: mcp-server-staging
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_ENVIRONMENT=staging
+    networks:
+      - storefront-network
+    restart: unless-stopped
+
+networks:
+  storefront-network:
+    driver: bridge
+

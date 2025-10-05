@@ -1,0 +1,16 @@
+# Docker Compose override for development environment
+# This file is automatically loaded by docker-compose
+
+version: '3.8'
+
+services:
+  storefront-agent:
+    environment:
+      - ENVIRONMENT=development
+    env_file:
+      - env.development
+    volumes:
+      - ./logs:/app/logs
+      - ./src:/app/src  # Mount source for development
+    command: ["python", "-m", "storefront_agent.cli", "run", "--environment", "development"]
+

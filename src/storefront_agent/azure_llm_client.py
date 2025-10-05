@@ -53,19 +53,33 @@ class AzureLLMClient:
             
             logger.info(f"Generating response for user input: {user_input[:100]}...")
             
-            response = await self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[
+            # Prepare parameters based on model type
+            params = {
+                "model": self.deployment_name,
+                "messages": [
                     {"role": "system", "content": system_content},
                     {"role": "user", "content": user_input}
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                frequency_penalty=frequency_penalty,
-                presence_penalty=presence_penalty,
-                stop=stop
-            )
+                ]
+            }
+            
+            # Add parameters only if they're supported by the model
+            # GPT-5 Nano has specific parameter restrictions
+            if self.deployment_name == "gpt-5-nano":
+                # GPT-5 Nano only supports default temperature (1.0) and no max_tokens
+                if temperature != 1.0:
+                    logger.warning("GPT-5 Nano only supports default temperature (1.0), ignoring provided temperature")
+            else:
+                # Standard models support all parameters
+                params.update({
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": top_p,
+                    "frequency_penalty": frequency_penalty,
+                    "presence_penalty": presence_penalty,
+                    "stop": stop
+                })
+            
+            response = await self.client.chat.completions.create(**params)
             
             # Extract response content
             content = response.choices[0].message.content
@@ -220,11 +234,18 @@ Original User Request: {original_request}
 
 MCP Server Response: {json.dumps(mcp_response, indent=2)}
 
+The MCP server has these tools available:
+- get_product: Get detailed product information by ID
+- search_products: Search for products by query
+- get_categories: Get all product categories
+- get_products_by_category: Get products by category
+
 Please provide:
 1. A clear explanation of what happened
 2. Whether the operation was successful
-3. Any relevant data or results
-4. Next steps if applicable
+3. Any relevant data or results from the tool execution
+4. If there was an error, explain what went wrong and suggest alternatives
+5. Next steps if applicable
 
 Keep the explanation conversational and helpful for a non-technical user.
 """

@@ -1,0 +1,37 @@
+# Docker Compose for Storefront Agent Web API
+
+version: '3.8'
+
+services:
+  storefront-agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: storefront-agent-api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=false
+    env_file:
+      - env.production
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - storefront-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  storefront-network:
+    driver: bridge
+
+volumes:
+  logs:

@@ -49,6 +49,9 @@ class MCPClient:
             elif self.server_url.startswith("http://") or self.server_url.startswith("https://"):
                 # HTTP-based MCP server
                 logger.info("Using HTTP-based MCP server")
+                from .http_mcp_client import HTTPMCPClient
+                self.http_client = HTTPMCPClient(self.server_url, self.timeout)
+                await self.http_client.connect()
                 
             else:
                 raise ValueError(f"Unsupported server URL protocol: {self.server_url}")
@@ -169,6 +172,11 @@ class MCPClient:
             Response from the MCP server
         """
         try:
+            # Use HTTP client if available
+            if hasattr(self, 'http_client') and self.http_client:
+                return await self.http_client.call_tool(tool_name, parameters, timeout)
+            
+            # Fallback to WebSocket/JSON-RPC
             request = {
                 "jsonrpc": "2.0",
                 "method": "tools/call",
@@ -198,6 +206,11 @@ class MCPClient:
             List of available tools
         """
         try:
+            # Use HTTP client if available
+            if hasattr(self, 'http_client') and self.http_client:
+                return await self.http_client.list_tools()
+            
+            # Fallback to WebSocket/JSON-RPC
             request = {
                 "jsonrpc": "2.0",
                 "method": "tools/list"

@@ -7,6 +7,9 @@ An AI-powered agent that connects with Azure LLM and MCP (Model Context Protocol
 - **Natural Language Processing**: Understands user requests in natural language
 - **Azure LLM Integration**: Uses Azure OpenAI services for intelligent analysis
 - **MCP Server Communication**: Connects to MCP servers for storefront operations
+- **Web API**: REST, WebSocket, and Server-Sent Events (SSE) endpoints
+- **Multi-Environment Support**: Development, staging, and production configurations
+- **Docker Support**: Containerized deployment with Docker and Docker Compose
 - **Configurable Prompts**: Customizable system prompts and parameters
 - **Interactive Mode**: Command-line interface for real-time interaction
 - **Error Handling**: Comprehensive error handling and logging
@@ -282,6 +285,101 @@ Storefront-Agent/
 ### Customizing Responses
 
 Modify the prompt templates in `config.py` to customize how the agent responds to users.
+
+## Production Deployment
+
+### Azure Container Apps Deployment
+
+The Storefront Agent is designed for deployment on Azure Container Apps with production configuration.
+
+#### Prerequisites
+
+1. **Azure Container Apps Environment**: Set up Azure Container Apps
+2. **Azure OpenAI Service**: Deploy GPT-5 Nano model
+3. **MCP Server**: Deploy the storefront MCP server
+4. **Environment Configuration**: Configure production environment variables
+
+#### Environment Configuration
+
+1. **Update Production Config** (`env.production`):
+```bash
+# Azure Configuration
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-api-key
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5-nano
+
+# MCP Server Configuration
+MCP_SERVER_URL=https://your-mcp-server.azurecontainerapps.io
+```
+
+2. **Verify Configuration**:
+```bash
+# Test production configuration
+ENVIRONMENT=production python -c "from src.storefront_agent.config import config; print(f'MCP URL: {config.mcp.server_url}')"
+```
+
+#### Docker Deployment
+
+1. **Build Production Image**:
+```bash
+# Build the web API image
+docker build -f Dockerfile.api -t storefront-agent-api:production .
+
+# Or use Docker Compose
+docker-compose -f docker-compose.production.api.yml build
+```
+
+2. **Run Production Container**:
+```bash
+# Using Docker Compose
+docker-compose -f docker-compose.production.api.yml up -d
+
+# Or run directly
+docker run -d \
+  --name storefront-agent-api \
+  --env-file env.production \
+  -p 8000:8000 \
+  storefront-agent-api:production
+```
+
+#### Web API Endpoints
+
+The production deployment exposes these endpoints:
+
+- **Health Check**: `GET /health`
+- **Chat (REST)**: `POST /chat`
+- **Tools**: `GET /tools`
+- **Servers**: `GET /servers`
+- **WebSocket**: `ws://host:8000/ws/chat`
+- **Server-Sent Events**: `GET /sse/chat`
+
+#### Chat MFE Integration
+
+The Chat MFE can connect using:
+
+1. **REST API**:
+```javascript
+const response = await fetch('https://your-agent.azurecontainerapps.io/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ message: 'Search for products', session_id: 'user123' })
+});
+```
+
+2. **Server-Sent Events**:
+```javascript
+const eventSource = new EventSource('https://your-agent.azurecontainerapps.io/sse/chat?session_id=user123');
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Response:', data);
+};
+```
+
+#### Monitoring and Logs
+
+- **Health Check**: Monitor `/health` endpoint
+- **Logs**: Check container logs for debugging
+- **Metrics**: Monitor Azure Container Apps metrics
 
 ## Troubleshooting
 

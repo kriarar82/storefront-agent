@@ -1,0 +1,40 @@
+# Docker Compose configuration for production web API environment
+
+version: '3.8'
+
+services:
+  storefront-agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: storefront-agent-api-prod
+    environment:
+      - ENVIRONMENT=production
+    env_file:
+      - env.production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - storefront-network
+    restart: always
+    command: ["python", "run_api.py", "--host", "0.0.0.0", "--port", "8000"]
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  storefront-network:
+    driver: bridge

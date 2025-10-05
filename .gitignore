@@ -170,6 +170,7 @@ storefront_agent.log
 .env.local
 .env.production
 .env.test
+env.production.secure
 
 # OS specific
 .DS_Store

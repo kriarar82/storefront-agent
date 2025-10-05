@@ -5,9 +5,13 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
+from .environments import load_environment_config, Environment
 
 # Load environment variables
 load_dotenv()
+
+# Load environment-specific configuration
+env_config = load_environment_config()
 
 
 class AzureConfig(BaseSettings):
@@ -20,6 +24,19 @@ class AzureConfig(BaseSettings):
     
     class Config:
         env_file = ".env"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Override with environment-specific config if available
+        azure_config = env_config.get_azure_config()
+        if azure_config.get("endpoint"):
+            self.endpoint = azure_config["endpoint"]
+        if azure_config.get("api_key"):
+            self.api_key = azure_config["api_key"]
+        if azure_config.get("api_version"):
+            self.api_version = azure_config["api_version"]
+        if azure_config.get("deployment_name"):
+            self.deployment_name = azure_config["deployment_name"]
 
 
 class MCPConfig(BaseSettings):
@@ -30,6 +47,15 @@ class MCPConfig(BaseSettings):
     
     class Config:
         env_file = ".env"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Override with environment-specific config if available
+        mcp_config = env_config.get_mcp_config()
+        if mcp_config.get("server_url"):
+            self.server_url = mcp_config["server_url"]
+        if mcp_config.get("timeout"):
+            self.timeout = mcp_config["timeout"]
 
 
 class AppConfig(BaseSettings):
@@ -37,9 +63,21 @@ class AppConfig(BaseSettings):
     
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     max_retries: int = Field(default=3, env="MAX_RETRIES")
+    debug: bool = Field(default=False, env="DEBUG")
     
     class Config:
         env_file = ".env"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Override with environment-specific config if available
+        app_config = env_config.get_app_config()
+        if app_config.get("log_level"):
+            self.log_level = app_config["log_level"]
+        if app_config.get("max_retries"):
+            self.max_retries = app_config["max_retries"]
+        if app_config.get("debug") is not None:
+            self.debug = app_config["debug"]
 
 
 class StorefrontAgentConfig:
