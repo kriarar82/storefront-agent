@@ -27,6 +27,7 @@ COPY src/ ./src/
 COPY main.py .
 COPY setup.py .
 COPY pyproject.toml .
+COPY README.md .
 
 # Install the package
 RUN pip install -e .
